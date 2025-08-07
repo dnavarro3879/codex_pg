@@ -1,4 +1,4 @@
-'use client'
+"use client"
 
 import { useEffect, useState } from 'react'
 import dynamic from 'next/dynamic'
@@ -28,7 +28,7 @@ export default function Page() {
   })
 
   useEffect(() => {
-    if (!lat || !lng) {
+    if (lat === null || lng === null) {
       navigator.geolocation.getCurrentPosition(pos => {
         setLat(pos.coords.latitude)
         setLng(pos.coords.longitude)
@@ -37,9 +37,9 @@ export default function Page() {
   }, [lat, lng])
 
   useEffect(() => {
-    if (lat && lng) {
-  const base = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:8000'
-  fetch(`${base}/birds/rare?lat=${lat}&lng=${lng}`)
+    if (lat !== null && lng !== null) {
+      const base = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:8000'
+      fetch(`${base}/birds/rare?lat=${lat}&lng=${lng}`)
         .then(r => r.json())
         .then(setBirds)
         .catch(() => setBirds([]))
@@ -78,7 +78,7 @@ export default function Page() {
     series: [{ type: 'bar', data: Object.values(locationCounts) }],
   }
 
-  const mapCenter = lat && lng ? { lat, lng } : undefined
+  const mapCenter = lat !== null && lng !== null ? { lat, lng } : undefined
 
   return (
     <main className="max-w-4xl mx-auto p-4 space-y-4">
@@ -95,22 +95,32 @@ export default function Page() {
       <div className="font-medium">Found {birds.length} birds</div>
       {birds.length > 0 && (
         <div className="grid md:grid-cols-2 gap-4">
-          <Card className="p-2">
-            <ReactECharts option={speciesOption} style={{ height: 300 }} />
-          </Card>
-          <Card className="p-2">
-            <ReactECharts option={locationOption} style={{ height: 300 }} />
-          </Card>
+          <div className="p-2">
+            <Card>
+              <ReactECharts option={speciesOption} style={{ height: 300 }} />
+            </Card>
+          </div>
+          <div className="p-2">
+            <Card>
+              <ReactECharts option={locationOption} style={{ height: 300 }} />
+            </Card>
+          </div>
+          {isLoaded && mapCenter && (
+            <div className="p-2 md:col-span-2">
+              <Card>
+                <GoogleMap
+                  mapContainerStyle={{ width: '100%', height: '400px' }}
+                  center={mapCenter}
+                  zoom={8}
+                >
+                  {birds.map((b, i) => (
+                    <Marker key={i} position={{ lat: b.lat, lng: b.lng }} />
+                  ))}
+                </GoogleMap>
+              </Card>
+            </div>
+          )}
         </div>
-      )}
-      {isLoaded && mapCenter && (
-        <Card className="p-2">
-          <GoogleMap mapContainerStyle={{ width: '100%', height: '400px' }} center={mapCenter} zoom={8}>
-            {birds.map((b, i) => (
-              <Marker key={i} position={{ lat: b.lat, lng: b.lng }} />
-            ))}
-          </GoogleMap>
-        </Card>
       )}
       <div className="space-y-2">
         {birds.map((b, i) => (
