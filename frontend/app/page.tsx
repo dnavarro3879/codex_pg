@@ -27,7 +27,8 @@ export default function Page() {
 
   useEffect(() => {
     if (lat && lng) {
-      fetch(`http://localhost:8000/birds/rare?lat=${lat}&lng=${lng}`)
+  const base = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:8000'
+  fetch(`${base}/birds/rare?lat=${lat}&lng=${lng}`)
         .then(r => r.json())
         .then(setBirds)
         .catch(() => setBirds([]))

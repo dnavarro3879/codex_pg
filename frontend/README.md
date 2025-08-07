@@ -12,4 +12,10 @@ npm install
 npm run dev
 ```
 
-The app expects the backend to run on `http://localhost:8000`.
+By default, the app calls the backend at `http://localhost:8000`. To point to a
+different backend URL, set the environment variable `NEXT_PUBLIC_BACKEND_URL` in
+`.env.local`:
+
+```
+NEXT_PUBLIC_BACKEND_URL=http://localhost:8000
+```
