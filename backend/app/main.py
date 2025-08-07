@@ -42,6 +42,8 @@ class Bird(BaseModel):
     species: str
     loc: str
     date: str
+    lat: float
+    lng: float
 
 @app.get("/birds/rare", response_model=list[Bird])
 async def rare_birds(lat: float, lng: float, radius: int = 25):
@@ -62,6 +64,8 @@ async def rare_birds(lat: float, lng: float, radius: int = 25):
                 species=item.get("comName", "unknown"),
                 loc=item.get("locName", ""),
                 date=item.get("obsDt", ""),
+                lat=item.get("lat", 0.0),
+                lng=item.get("lng", 0.0),
             )
         )
     
