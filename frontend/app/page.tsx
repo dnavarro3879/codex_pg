@@ -1,17 +1,20 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useRef } from 'react'
+import { createPortal } from 'react-dom'
+
 import { useJsApiLoader, GoogleMap, Marker, InfoWindow } from '@react-google-maps/api'
 import { Button } from '../components/ui/button'
 import { Card } from '../components/ui/card'
 import { Header } from '../components/Header'
 import { SpeciesCard } from '../components/SpeciesCard'
 import { BirdCharts } from '../components/BirdCharts'
-import { MapPin, Loader2, Search, Bird, X, Filter, Binoculars, Feather, User } from 'lucide-react'
+import { MapPin, Loader2, Search, Bird, X, Filter, Binoculars, Feather, User, ChevronDown, Settings, Save, Star } from 'lucide-react'
 import { preloadBirdPhotos } from '../lib/flickr'
-import { birdAPI } from '../lib/api'
+import { birdAPI, authAPI } from '../lib/api'
 import { useAuth } from '../contexts/AuthContext'
 import { useAuthModal } from '../contexts/useAuthModal'
+import { LocationModal } from '../components/LocationModal'
 
 interface ObservedBird {
   species: string
@@ -25,6 +28,17 @@ interface ObservedBird {
   user_display_name: string | null
 }
 
+interface SavedLocation {
+  id: number
+  name: string
+  location_type: 'zip' | 'city'
+  location_value: string
+  lat: number
+  lng: number
+  is_default: boolean
+  created_at: string
+}
+
 export default function Page() {
   const [lat, setLat] = useState<number | null>(null)
   const [lng, setLng] = useState<number | null>(null)
@@ -36,13 +50,52 @@ export default function Page() {
   const [locationLoading, setLocationLoading] = useState(true)
   const { user } = useAuth()
   const authModal = useAuthModal()
+  
+  // Location management state
+  const [savedLocations, setSavedLocations] = useState<SavedLocation[]>([])
+  const [currentLocation, setCurrentLocation] = useState<SavedLocation | null>(null)
+  const [showLocationModal, setShowLocationModal] = useState(false)
+  const [showSavePrompt, setShowSavePrompt] = useState(false)
+  const [lastSearchedZip, setLastSearchedZip] = useState<string | null>(null)
+  const [showLocationDropdown, setShowLocationDropdown] = useState(false)
+  const dropdownButtonRef = useRef<HTMLButtonElement>(null)
+  const [dropdownPosition, setDropdownPosition] = useState({ top: 0, left: 0 })
 
   const { isLoaded } = useJsApiLoader({
     id: 'google-map-script',
     googleMapsApiKey: process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY || '',
   })
 
+  // Load saved locations and default location on mount
   useEffect(() => {
+    if (user) {
+      loadSavedLocations()
+    }
+  }, [user])
+
+  const loadSavedLocations = async () => {
+    try {
+      const locations = await authAPI.getLocations()
+      setSavedLocations(locations)
+      
+      // Auto-load default location if exists
+      const defaultLocation = locations.find((loc: SavedLocation) => loc.is_default)
+      if (defaultLocation) {
+        setLat(defaultLocation.lat)
+        setLng(defaultLocation.lng)
+        setCurrentLocation(defaultLocation)
+        setLocationLoading(false)
+      } else {
+        // No default, try to get current location
+        getCurrentLocation()
+      }
+    } catch (error) {
+      console.error('Error loading locations:', error)
+      getCurrentLocation()
+    }
+  }
+
+  const getCurrentLocation = () => {
     if (lat === null || lng === null) {
       navigator.geolocation.getCurrentPosition(
         pos => {
@@ -55,7 +108,13 @@ export default function Page() {
         }
       )
     }
-  }, [lat, lng])
+  }
+
+  useEffect(() => {
+    if (!user && lat === null && lng === null) {
+      getCurrentLocation()
+    }
+  }, [user, lat, lng])
 
   useEffect(() => {
     if (lat !== null && lng !== null) {
@@ -74,6 +133,7 @@ export default function Page() {
   const handleZip = async () => {
     if (!zip) return
     setLoading(true)
+    setCurrentLocation(null) // Clear current saved location when searching new
     const res = await fetch(`https://api.zippopotam.us/us/${zip}`)
     if (!res.ok) {
       setLoading(false)
@@ -83,6 +143,35 @@ export default function Page() {
     const place = data.places[0]
     setLat(parseFloat(place.latitude))
     setLng(parseFloat(place.longitude))
+    
+    // Show save prompt if user is logged in and this ZIP isn't already saved
+    if (user && !savedLocations.some(loc => loc.location_value === zip)) {
+      setLastSearchedZip(zip)
+      setShowSavePrompt(true)
+    }
+  }
+
+  const handleLocationSelect = (location: SavedLocation) => {
+    setCurrentLocation(location)
+    setLat(location.lat)
+    setLng(location.lng)
+    setZip('') // Clear manual ZIP input
+  }
+
+  const handleSaveLocation = async () => {
+    if (!lastSearchedZip) return
+    
+    try {
+      const name = prompt('Name this location (e.g., "Home", "Office"):') || `ZIP ${lastSearchedZip}`
+      if (name) {
+        await authAPI.addLocation(name, 'zip', lastSearchedZip, false)
+        await loadSavedLocations()
+        setShowSavePrompt(false)
+        setLastSearchedZip(null)
+      }
+    } catch (error) {
+      console.error('Error saving location:', error)
+    }
   }
 
   const displayedBirds = birds.filter(b => {
@@ -182,36 +271,247 @@ export default function Page() {
                 </h1>
               </div>
               
-              <Card variant="glass" className="p-4 flex-shrink-0">
-                <div className="flex flex-col sm:flex-row gap-3 items-center">
-                  <div className="relative flex-1 min-w-[240px]">
-                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-forest-600 w-4 h-4" />
-                    <input
-                      value={zip}
-                      onChange={e => setZip(e.target.value)}
-                      onKeyDown={e => e.key === 'Enter' && handleZip()}
-                      placeholder="Enter ZIP code"
-                      className="w-full pl-10 pr-3 py-2.5 rounded-lg border border-sage-300 bg-white/90 focus:ring-2 focus:ring-forest-400 focus:border-forest-400 transition-all placeholder-earth-400 text-forest-700 text-sm font-medium"
-                      disabled={loading}
-                    />
-                  </div>
-                  <Button variant="nature" onClick={handleZip} disabled={loading || !zip} size="sm" className="whitespace-nowrap">
-                    {loading ? (
+              <Card variant="glass" className="p-4 flex-shrink-0 min-w-[400px]">
+                <div className="flex flex-col gap-3">
+                  {/* Improved Location Selector */}
+                  <div className="flex gap-2">
+                    {/* Location Button/Selector */}
+                    {currentLocation ? (
                       <>
-                        <Loader2 className="w-4 h-4 animate-spin" />
-                        <span>Finding...</span>
+                        {/* Set as Default Button */}
+                        {!currentLocation.is_default && (
+                          <button
+                            onClick={async () => {
+                              try {
+                                await authAPI.setDefaultLocation(currentLocation.id)
+                                // Update the location to show it's now default
+                                setCurrentLocation({ ...currentLocation, is_default: true })
+                                // Reload locations to update the list
+                                loadSavedLocations()
+                              } catch (error) {
+                                console.error('Error setting default location:', error)
+                              }
+                            }}
+                            className="flex items-center gap-2 px-3 py-2.5 bg-amber-50 hover:bg-amber-100 rounded-lg border border-amber-200 transition-colors"
+                            title="Set as default location"
+                          >
+                            <Star className="w-4 h-4 text-amber-600" />
+                            <span className="text-sm font-medium text-amber-700 whitespace-nowrap">Set Default</span>
+                          </button>
+                        )}
+                        
+                        <div className="flex-1 flex items-center gap-2 px-3 py-2.5 bg-sage-50 rounded-lg border border-sage-200">
+                          <MapPin className="w-4 h-4 text-forest-600 flex-shrink-0" />
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2">
+                              <span className="font-medium text-forest-700 text-sm truncate">
+                                {currentLocation.name}
+                              </span>
+                              {currentLocation.is_default && (
+                                <span title="Default location">
+                                  <Star className="w-3 h-3 text-amber-500 fill-amber-500" />
+                                </span>
+                              )}
+                            </div>
+                            <div className="text-xs text-earth-500">
+                              {currentLocation.location_type === 'zip' ? 'ZIP ' : ''}{currentLocation.location_value}
+                            </div>
+                          </div>
+                          <button
+                            onClick={() => {
+                              setCurrentLocation(null)
+                              setZip('')
+                            }}
+                            className="p-1 hover:bg-sage-100 rounded transition-colors"
+                            title="Clear location"
+                          >
+                            <X className="w-3 h-3 text-earth-500" />
+                          </button>
+                        </div>
                       </>
                     ) : (
-                      <>
-                        <Binoculars className="w-4 h-4" />
-                        <span>Explore</span>
-                      </>
+                      <div className="flex-1 flex gap-2">
+                        {/* Quick Location Picker */}
+                        {savedLocations.length > 0 && (
+                          <>
+                            <button
+                              ref={dropdownButtonRef}
+                              className="flex items-center gap-2 px-3 py-2.5 rounded-lg border border-sage-300 bg-white hover:bg-sage-50 transition-colors"
+                              onClick={() => {
+                                if (!showLocationDropdown && dropdownButtonRef.current) {
+                                  const rect = dropdownButtonRef.current.getBoundingClientRect()
+                                  setDropdownPosition({
+                                    top: rect.bottom + window.scrollY + 4,
+                                    left: rect.left + window.scrollX
+                                  })
+                                }
+                                setShowLocationDropdown(!showLocationDropdown)
+                              }}
+                              onBlur={() => setTimeout(() => setShowLocationDropdown(false), 200)}
+                            >
+                              <MapPin className="w-4 h-4 text-forest-600" />
+                              <span className="text-sm font-medium text-forest-700">My Locations</span>
+                              <ChevronDown className={`w-3 h-3 text-forest-600 transition-transform ${showLocationDropdown ? 'rotate-180' : ''}`} />
+                            </button>
+                            
+                            {/* Dropdown Menu - Rendered as Portal */}
+                            {showLocationDropdown && typeof window !== 'undefined' && createPortal(
+                              <div 
+                                className="fixed w-64 bg-white rounded-lg shadow-lg border border-sage-200 py-1 z-[10000] animate-in fade-in slide-in-from-top-1"
+                                style={{ 
+                                  top: `${dropdownPosition.top}px`, 
+                                  left: `${dropdownPosition.left}px` 
+                                }}
+                              >
+                                {savedLocations.map(loc => (
+                                  <button
+                                    key={loc.id}
+                                    onClick={() => {
+                                      handleLocationSelect(loc)
+                                      setShowLocationDropdown(false)
+                                    }}
+                                    className="w-full flex items-center gap-3 px-3 py-2 hover:bg-sage-50 transition-colors text-left"
+                                  >
+                                    <MapPin className="w-4 h-4 text-forest-500 flex-shrink-0" />
+                                    <div className="flex-1">
+                                      <div className="flex items-center gap-2">
+                                        <span className="text-sm font-medium text-forest-700">
+                                          {loc.name}
+                                        </span>
+                                        {loc.is_default && (
+                                          <span className="text-xs px-1.5 py-0.5 bg-amber-100 text-amber-700 rounded">
+                                            Default
+                                          </span>
+                                        )}
+                                      </div>
+                                      <span className="text-xs text-earth-500">
+                                        {loc.location_type === 'zip' ? 'ZIP ' : ''}{loc.location_value}
+                                      </span>
+                                    </div>
+                                  </button>
+                                ))}
+                                <div className="border-t border-sage-200 mt-1 pt-1">
+                                  <button
+                                    onClick={() => {
+                                      setShowLocationModal(true)
+                                      setShowLocationDropdown(false)
+                                    }}
+                                    className="w-full flex items-center gap-3 px-3 py-2 hover:bg-sage-50 transition-colors text-left"
+                                  >
+                                    <Settings className="w-4 h-4 text-earth-500" />
+                                    <span className="text-sm text-earth-600">Manage Locations</span>
+                                  </button>
+                                </div>
+                              </div>,
+                              document.body
+                            )}
+                          </>
+                        )}
+                        
+                        {/* Manual ZIP Entry */}
+                        <div className="relative flex-1">
+                          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-forest-600 w-4 h-4" />
+                          <input
+                            value={zip}
+                            onChange={e => setZip(e.target.value)}
+                            onKeyDown={e => e.key === 'Enter' && handleZip()}
+                            placeholder={savedLocations.length > 0 ? "Or enter ZIP" : "Enter ZIP code"}
+                            className="w-full pl-10 pr-3 py-2.5 rounded-lg border border-sage-300 bg-white/90 focus:ring-2 focus:ring-forest-400 focus:border-forest-400 transition-all placeholder-earth-400 text-forest-700 text-sm font-medium"
+                            disabled={loading}
+                          />
+                        </div>
+                      </div>
                     )}
-                  </Button>
+                    
+                    {/* Search/Change Button */}
+                    {currentLocation ? (
+                      <Button 
+                        variant="nature" 
+                        onClick={() => {
+                          // Clear current location to show location selector
+                          setCurrentLocation(null)
+                          setZip('')
+                        }}
+                        size="sm" 
+                        className="whitespace-nowrap"
+                      >
+                        <MapPin className="w-4 h-4" />
+                        <span>Change</span>
+                      </Button>
+                    ) : (
+                      <Button 
+                        variant="nature" 
+                        onClick={handleZip}
+                        disabled={loading || !zip}
+                        size="sm" 
+                        className="whitespace-nowrap"
+                      >
+                        {loading ? (
+                          <>
+                            <Loader2 className="w-4 h-4 animate-spin" />
+                            <span>Finding...</span>
+                          </>
+                        ) : (
+                          <>
+                            <Binoculars className="w-4 h-4" />
+                            <span>Search</span>
+                          </>
+                        )}
+                      </Button>
+                    )}
+                    
+                    {/* Settings Button (only if no saved locations) */}
+                    {savedLocations.length === 0 && (
+                      <Button 
+                        variant="ghost" 
+                        size="sm" 
+                        onClick={() => setShowLocationModal(true)}
+                        title="Manage Locations"
+                      >
+                        <Settings className="w-4 h-4" />
+                      </Button>
+                    )}
+                  </div>
+                  
                   {locationLoading && (
-                    <span className="text-xs text-earth-500">Detecting location...</span>
+                    <span className="text-xs text-earth-500 text-center">Detecting your location...</span>
                   )}
                 </div>
+                
+                {/* Save Location Prompt */}
+                {showSavePrompt && (
+                  <div className="mt-3 p-3 bg-amber-50 border border-amber-200 rounded-lg animate-in slide-in-from-top-2">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <Save className="w-4 h-4 text-amber-600" />
+                        <span className="text-sm text-amber-700">
+                          Save ZIP {lastSearchedZip} for quick access?
+                        </span>
+                      </div>
+                      <div className="flex gap-2">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => {
+                            setShowSavePrompt(false)
+                            setLastSearchedZip(null)
+                          }}
+                          className="text-xs"
+                        >
+                          No
+                        </Button>
+                        <Button
+                          variant="nature"
+                          size="sm"
+                          onClick={handleSaveLocation}
+                          className="text-xs"
+                        >
+                          Save
+                        </Button>
+                      </div>
+                    </div>
+                  </div>
+                )}
               </Card>
             </div>
 
@@ -282,7 +582,7 @@ export default function Page() {
                     </div>
                     <div>
                       <p className="text-2xl font-heading font-bold text-forest-600">{displayedBirds.length}</p>
-                      <p className="text-xs text-earth-500">Rare Birds</p>
+                      <p className="text-xs text-earth-500">Rare Birds Spotted</p>
                     </div>
                   </div>
                   
@@ -447,12 +747,13 @@ export default function Page() {
                     }
                     acc[bird.species].sightings.push({
                       location: bird.loc,
+                      loc_id: bird.loc_id,
                       date: bird.date,
                       lat: bird.lat,
                       lng: bird.lng
                     })
                     return acc
-                  }, {} as Record<string, {species_code: string, sightings: Array<{location: string, date: string, lat: number, lng: number}>}>)
+                  }, {} as Record<string, {species_code: string, sightings: Array<{location: string, loc_id: string, date: string, lat: number, lng: number}>}>)
                 ).map(([species, data]) => (
                   <SpeciesCard
                     key={species}
@@ -484,6 +785,17 @@ export default function Page() {
           </div>
         </div>
       </main>
+      
+      {/* Location Management Modal */}
+      <LocationModal
+        isOpen={showLocationModal}
+        onClose={() => {
+          setShowLocationModal(false)
+          loadSavedLocations() // Refresh locations after modal closes
+        }}
+        onLocationSelect={handleLocationSelect}
+        currentLocationId={currentLocation?.id || null}
+      />
     </>
   )
 }

@@ -17,6 +17,7 @@ class User(Base):
     # Relationships
     searches = relationship("UserSearch", back_populates="user", cascade="all, delete-orphan")
     favorites = relationship("UserFavoriteBird", back_populates="user", cascade="all, delete-orphan")
+    locations = relationship("UserLocation", back_populates="user", cascade="all, delete-orphan")
 
 
 class UserSearch(Base):
@@ -47,3 +48,20 @@ class UserFavoriteBird(Base):
 
     # Relationships
     user = relationship("User", back_populates="favorites")
+
+
+class UserLocation(Base):
+    __tablename__ = "user_locations"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    name = Column(String, nullable=False)  # Friendly name like "Home", "Work"
+    location_type = Column(String, nullable=False)  # "zip" or "city"
+    location_value = Column(String, nullable=False)  # The actual ZIP code or city name
+    lat = Column(Float, nullable=False)
+    lng = Column(Float, nullable=False)
+    is_default = Column(Boolean, default=False)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+    # Relationships
+    user = relationship("User", back_populates="locations")

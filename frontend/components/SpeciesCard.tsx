@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { Calendar, MapPin, Eye, X, Camera, Feather, TreePine, Heart } from 'lucide-react'
+import { Calendar, MapPin, Eye, X, Camera, Feather, TreePine, Heart, ExternalLink, Map, Navigation } from 'lucide-react'
 import { getBirdPhoto } from '../lib/flickr'
 import { Button } from './ui/button'
 import { authAPI } from '../lib/api'
@@ -9,6 +9,7 @@ import { useAuth } from '../contexts/AuthContext'
 
 interface Sighting {
   location: string
+  loc_id: string
   date: string
   lat: number
   lng: number
@@ -142,10 +143,23 @@ export function SpeciesCard({ species, speciesCode, sightings }: SpeciesCardProp
           </div>
 
           <div className="pt-3 border-t border-sage-100 flex items-center justify-between">
-            <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-heading font-semibold bg-terracotta-100 text-terracotta-600">
-              <Feather className="w-3 h-3" />
-              Rare Species
-            </span>
+            <div className="flex items-center gap-2">
+              <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-heading font-semibold bg-terracotta-100 text-terracotta-600">
+                <Feather className="w-3 h-3" />
+                Rare Species
+              </span>
+              <a
+                href={`https://ebird.org/species/${speciesCode}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                onClick={(e) => e.stopPropagation()}
+                className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-heading font-semibold text-sky-600 hover:bg-sky-50 transition-colors"
+                title="View on eBird"
+              >
+                <ExternalLink className="w-3 h-3" />
+                eBird
+              </a>
+            </div>
             <div className="flex items-center gap-2">
               {user && (
                 <button
@@ -212,7 +226,7 @@ export function SpeciesCard({ species, speciesCode, sightings }: SpeciesCardProp
                   .map((sighting, index) => (
                     <div key={index} className="p-4 bg-sage-50 rounded-xl hover:bg-sage-100 transition-all duration-200 border border-sage-200 hover:border-sage-300">
                       <div className="flex items-start justify-between">
-                        <div className="space-y-2">
+                        <div className="space-y-2 flex-1">
                           <div className="flex items-center gap-2">
                             <MapPin className="w-4 h-4 text-forest-600" />
                             <span className="font-heading font-semibold text-forest-700">{sighting.location}</span>
@@ -228,8 +242,40 @@ export function SpeciesCard({ species, speciesCode, sightings }: SpeciesCardProp
                               })}
                             </span>
                           </div>
+                          <div className="flex items-center gap-2 pt-2">
+                            <a
+                              href={`https://ebird.org/hotspot/${sighting.loc_id}`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="inline-flex items-center gap-1 px-2.5 py-1 bg-white rounded-lg text-xs font-medium text-sky-600 hover:bg-sky-50 border border-sky-200 transition-colors"
+                              title="View location on eBird"
+                            >
+                              <ExternalLink className="w-3 h-3" />
+                              eBird Location
+                            </a>
+                            <a
+                              href={`https://www.google.com/maps/search/?api=1&query=${sighting.lat},${sighting.lng}`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="inline-flex items-center gap-1 px-2.5 py-1 bg-white rounded-lg text-xs font-medium text-green-600 hover:bg-green-50 border border-green-200 transition-colors"
+                              title="Open in Google Maps"
+                            >
+                              <Map className="w-3 h-3" />
+                              Google Maps
+                            </a>
+                            <a
+                              href={`https://maps.apple.com/?ll=${sighting.lat},${sighting.lng}&q=${encodeURIComponent(sighting.location)}`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="inline-flex items-center gap-1 px-2.5 py-1 bg-white rounded-lg text-xs font-medium text-gray-600 hover:bg-gray-50 border border-gray-200 transition-colors"
+                              title="Open in Apple Maps"
+                            >
+                              <Navigation className="w-3 h-3" />
+                              Apple Maps
+                            </a>
+                          </div>
                         </div>
-                        <span className="text-xs font-heading font-semibold text-terracotta-500 bg-terracotta-100 px-2 py-1 rounded-full">
+                        <span className="text-xs font-heading font-semibold text-terracotta-500 bg-terracotta-100 px-2 py-1 rounded-full ml-2">
                           #{sightings.length - index}
                         </span>
                       </div>

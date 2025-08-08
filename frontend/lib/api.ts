@@ -102,4 +102,34 @@ export const authAPI = {
     })
     return response.data
   },
+
+  // Location management functions
+  getLocations: async () => {
+    const response = await api.get('/auth/locations')
+    return response.data
+  },
+
+  addLocation: async (name: string, locationType: 'zip' | 'city', locationValue: string, isDefault: boolean = false) => {
+    const response = await api.post('/auth/locations', {
+      name,
+      location_type: locationType,
+      location_value: locationValue,
+      is_default: isDefault
+    })
+    return response.data
+  },
+
+  updateLocation: async (locationId: number, updates: { name?: string, is_default?: boolean }) => {
+    const response = await api.put(`/auth/locations/${locationId}`, updates)
+    return response.data
+  },
+
+  deleteLocation: async (locationId: number) => {
+    await api.delete(`/auth/locations/${locationId}`)
+  },
+
+  setDefaultLocation: async (locationId: number) => {
+    const response = await api.post(`/auth/locations/${locationId}/set-default`)
+    return response.data
+  },
 }

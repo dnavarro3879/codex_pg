@@ -87,3 +87,27 @@ class ObservedBird(BaseModel):
     lng: float
     how_many: Optional[int] = None
     user_display_name: Optional[str] = None
+
+# Location schemas
+class LocationBase(BaseModel):
+    name: str = Field(..., min_length=1, max_length=100)
+    location_type: str = Field(..., pattern="^(zip|city)$")
+    location_value: str = Field(..., min_length=1, max_length=100)
+
+class LocationCreate(LocationBase):
+    is_default: bool = False
+
+class LocationUpdate(BaseModel):
+    name: Optional[str] = Field(None, min_length=1, max_length=100)
+    is_default: Optional[bool] = None
+
+class LocationResponse(LocationBase):
+    id: int
+    user_id: int
+    lat: float
+    lng: float
+    is_default: bool
+    created_at: datetime
+
+    class Config:
+        from_attributes = True

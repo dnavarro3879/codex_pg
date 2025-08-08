@@ -5,6 +5,7 @@ from typing import List
 
 from .. import models, schemas, auth
 from ..database import get_db
+from ..services.locations import LocationService
 
 router = APIRouter(
     prefix="/auth",
@@ -191,3 +192,174 @@ async def get_search_history(
         .limit(limit)\
         .all()
     return searches
+
+@router.get("/locations", response_model=List[schemas.LocationResponse])
+async def get_locations(
+    current_user: models.User = Depends(auth.get_current_active_user),
+    db: Session = Depends(get_db)
+):
+    """Get user's saved locations."""
+    locations = db.query(models.UserLocation)\
+        .filter(models.UserLocation.user_id == current_user.id)\
+        .order_by(models.UserLocation.is_default.desc(), models.UserLocation.created_at.desc())\
+        .all()
+    return locations
+
+@router.post("/locations", response_model=schemas.LocationResponse, status_code=status.HTTP_201_CREATED)
+async def add_location(
+    location_data: schemas.LocationCreate,
+    current_user: models.User = Depends(auth.get_current_active_user),
+    db: Session = Depends(get_db)
+):
+    """Add a new saved location."""
+    # Check if location name already exists for this user
+    existing = db.query(models.UserLocation).filter(
+        models.UserLocation.user_id == current_user.id,
+        models.UserLocation.name == location_data.name
+    ).first()
+    
+    if existing:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Location with this name already exists"
+        )
+    
+    # Geocode the location
+    try:
+        lat, lng = await LocationService.geocode_location(
+            location_data.location_type,
+            location_data.location_value
+        )
+    except HTTPException as e:
+        raise e
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Failed to geocode location: {str(e)}"
+        )
+    
+    # If this is set as default, unset other defaults
+    if location_data.is_default:
+        db.query(models.UserLocation).filter(
+            models.UserLocation.user_id == current_user.id
+        ).update({"is_default": False})
+    
+    # Create new location
+    db_location = models.UserLocation(
+        user_id=current_user.id,
+        name=location_data.name,
+        location_type=location_data.location_type,
+        location_value=location_data.location_value,
+        lat=lat,
+        lng=lng,
+        is_default=location_data.is_default
+    )
+    db.add(db_location)
+    db.commit()
+    db.refresh(db_location)
+    
+    return db_location
+
+@router.put("/locations/{location_id}", response_model=schemas.LocationResponse)
+async def update_location(
+    location_id: int,
+    location_update: schemas.LocationUpdate,
+    current_user: models.User = Depends(auth.get_current_active_user),
+    db: Session = Depends(get_db)
+):
+    """Update a saved location."""
+    location = db.query(models.UserLocation).filter(
+        models.UserLocation.id == location_id,
+        models.UserLocation.user_id == current_user.id
+    ).first()
+    
+    if not location:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Location not found"
+        )
+    
+    # Update fields if provided
+    if location_update.name is not None:
+        # Check if new name already exists
+        existing = db.query(models.UserLocation).filter(
+            models.UserLocation.user_id == current_user.id,
+            models.UserLocation.name == location_update.name,
+            models.UserLocation.id != location_id
+        ).first()
+        
+        if existing:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Location with this name already exists"
+            )
+        
+        location.name = location_update.name
+    
+    if location_update.is_default is not None:
+        if location_update.is_default:
+            # Unset other defaults
+            db.query(models.UserLocation).filter(
+                models.UserLocation.user_id == current_user.id,
+                models.UserLocation.id != location_id
+            ).update({"is_default": False})
+        location.is_default = location_update.is_default
+    
+    db.commit()
+    db.refresh(location)
+    
+    return location
+
+@router.delete("/locations/{location_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_location(
+    location_id: int,
+    current_user: models.User = Depends(auth.get_current_active_user),
+    db: Session = Depends(get_db)
+):
+    """Delete a saved location."""
+    location = db.query(models.UserLocation).filter(
+        models.UserLocation.id == location_id,
+        models.UserLocation.user_id == current_user.id
+    ).first()
+    
+    if not location:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Location not found"
+        )
+    
+    db.delete(location)
+    db.commit()
+    
+    return None
+
+@router.post("/locations/{location_id}/set-default", response_model=schemas.LocationResponse)
+async def set_default_location(
+    location_id: int,
+    current_user: models.User = Depends(auth.get_current_active_user),
+    db: Session = Depends(get_db)
+):
+    """Set a location as the default."""
+    location = db.query(models.UserLocation).filter(
+        models.UserLocation.id == location_id,
+        models.UserLocation.user_id == current_user.id
+    ).first()
+    
+    if not location:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Location not found"
+        )
+    
+    # Unset other defaults
+    db.query(models.UserLocation).filter(
+        models.UserLocation.user_id == current_user.id,
+        models.UserLocation.id != location_id
+    ).update({"is_default": False})
+    
+    # Set this as default
+    location.is_default = True
+    db.commit()
+    db.refresh(location)
+    
+    return location
