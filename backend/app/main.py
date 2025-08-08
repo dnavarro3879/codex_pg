@@ -1,10 +1,15 @@
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, Depends
 from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel
-import httpx
+from sqlalchemy.orm import Session
 import os
 from dotenv import load_dotenv
 import logging
+from typing import Optional
+
+from .database import engine, get_db
+from . import models, schemas, auth
+from .routers import auth as auth_router
+from .services import BirdService
 
 
 #TODO: Configure logging to console
@@ -13,10 +18,10 @@ logging.getLogger().addHandler(logging.StreamHandler())
 
 load_dotenv()
 
-app = FastAPI(title="Rare Bird Finder")
+# Create database tables
+models.Base.metadata.create_all(bind=engine)
 
-EBIRD_API = "https://api.ebird.org/v2/data/obs/geo/recent/notable"
-EBIRD_KEY = os.getenv("EBIRD_API_KEY", "")
+app = FastAPI(title="Rare Bird Finder")
 
 # CORS configuration: allow the frontend to call this API
 FRONTEND_ORIGIN = os.getenv("FRONTEND_ORIGIN")
@@ -33,42 +38,36 @@ allowed_origins = [o for i, o in enumerate(allowed_origins) if o and o not in al
 app.add_middleware(
     CORSMiddleware,
     allow_origins=allowed_origins or ["*"],  # fall back to * if nothing set
-    allow_credentials=False,
+    allow_credentials=True,  # Changed to True for auth cookies
     allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
     allow_headers=["*"],
+    expose_headers=["*"],  # Allow frontend to read all headers
 )
 
-class Bird(BaseModel):
-    species: str
-    loc: str
-    date: str
-    lat: float
-    lng: float
+# Include routers
+app.include_router(auth_router.router)
 
-@app.get("/birds/rare", response_model=list[Bird])
-async def rare_birds(lat: float, lng: float, radius: int = 25):
+@app.get("/birds/rare", response_model=list[schemas.ObservedBird])
+async def rare_birds(
+    lat: float, 
+    lng: float, 
+    radius: int = 25,
+    current_user: Optional[models.User] = Depends(auth.get_optional_user),
+    db: Session = Depends(get_db)
+):
     """Fetch notable sightings from the eBird API."""
-    headers = {"X-eBirdApiToken": EBIRD_KEY}
-    params = {"lat": lat, "lng": lng, "dist": radius}
-
-    async with httpx.AsyncClient(timeout=10) as client:
-        res = await client.get(EBIRD_API, params=params, headers=headers)
-        if res.status_code != 200:
-            raise HTTPException(res.status_code, res.text)
-        data = res.json()
-
-    birds: list[Bird] = []
-    for item in data:
-        birds.append(
-            Bird(
-                species=item.get("comName", "unknown"),
-                loc=item.get("locName", ""),
-                date=item.get("obsDt", ""),
-                lat=item.get("lat", 0.0),
-                lng=item.get("lng", 0.0),
-            )
-        )
+    # Fetch bird data using the service
+    birds = await BirdService.fetch_rare_birds(lat, lng, radius)
     
-    logging.info(f"Found {len(birds)} rare birds near ({lat}, {lng})")
-    logging.info(f"Birds data (first 10): {birds[:10]}")
+    # Save search to user's history if authenticated
+    if current_user:
+        BirdService.save_user_search(
+            db=db,
+            user=current_user,
+            lat=lat,
+            lng=lng,
+            radius=radius,
+            bird_count=len(birds)
+        )
+        
     return birds

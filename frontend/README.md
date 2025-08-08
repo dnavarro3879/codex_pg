@@ -1,3 +1,4 @@
+
 # Next.js Frontend
 
 This interface uses Next.js with Tailwind CSS to show rare bird sightings from
