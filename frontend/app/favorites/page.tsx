@@ -8,7 +8,7 @@ import { authAPI } from '../../lib/api'
 import { getBirdPhotoFromWikimedia } from '../../lib/wikimedia'
 import { useAuth } from '../../contexts/AuthContext'
 import { useAuthModal } from '../../contexts/useAuthModal'
-import { Heart, Trash2, Loader2, Bird, Search, Feather, Calendar, User, Camera } from 'lucide-react'
+import { Heart, Trash2, Loader2, Bird, Search, Feather, Calendar, User, Camera, ExternalLink } from 'lucide-react'
 import Link from 'next/link'
 
 interface FavoriteBird {
@@ -225,6 +225,16 @@ export default function FavoritesPage() {
                         <span className="inline-flex items-center gap-1 px-2 py-1 bg-sage-100 rounded-full text-xs font-medium">
                           Code: {bird.species_code}
                         </span>
+                        <a
+                          href={`https://ebird.org/species/${bird.species_code}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="inline-flex items-center gap-1 px-2 py-1 bg-sky-100 hover:bg-sky-200 rounded-full text-xs font-medium text-sky-700 transition-colors"
+                          title="View on eBird"
+                        >
+                          <ExternalLink className="w-3 h-3" />
+                          eBird
+                        </a>
                       </div>
 
                       <div className="flex items-center gap-2 text-sm text-earth-500">

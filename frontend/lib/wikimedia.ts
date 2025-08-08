@@ -49,31 +49,40 @@ function hashString(str: string): number {
  */
 async function getWikipediaPageImage(birdName: string): Promise<{ url: string; attribution: string } | null> {
   try {
-    const params = new URLSearchParams({
-      action: 'query',
-      prop: 'pageimages',
-      piprop: 'original',
-      titles: birdName,
-      format: 'json',
-      formatversion: '2',
-      origin: '*'
-    })
-
-    const response = await fetch(`https://en.wikipedia.org/w/api.php?${params}`)
+    // Try with "(bird)" disambiguation first for common ambiguous names
+    const disambiguatedNames = [
+      `${birdName} (bird)`,  // Try with (bird) disambiguation
+      birdName                // Original name as fallback
+    ]
     
-    if (!response.ok) {
-      throw new Error('Wikipedia API request failed')
-    }
+    for (const searchName of disambiguatedNames) {
+      const params = new URLSearchParams({
+        action: 'query',
+        prop: 'pageimages',
+        piprop: 'original',
+        titles: searchName,
+        format: 'json',
+        formatversion: '2',
+        origin: '*'
+      })
 
-    const data = await response.json()
-    
-    if (data.query?.pages?.length > 0) {
-      const page: WikipediaPage = data.query.pages[0]
+      const response = await fetch(`https://en.wikipedia.org/w/api.php?${params}`)
       
-      if (page.original?.source) {
-        return {
-          url: page.original.source,
-          attribution: 'Wikipedia'
+      if (!response.ok) {
+        continue
+      }
+
+      const data = await response.json()
+      
+      if (data.query?.pages?.length > 0) {
+        const page: WikipediaPage = data.query.pages[0]
+        
+        // If we found an image and the page exists (pageid not -1), use it
+        if (page.original?.source && page.pageid > 0) {
+          return {
+            url: page.original.source,
+            attribution: 'Wikipedia'
+          }
         }
       }
     }
