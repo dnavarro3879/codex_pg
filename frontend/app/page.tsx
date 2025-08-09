@@ -3,13 +3,14 @@
 import { useEffect, useState, useRef } from 'react'
 import { createPortal } from 'react-dom'
 
-import { useJsApiLoader, GoogleMap, Marker, InfoWindow } from '@react-google-maps/api'
+import { useJsApiLoader } from '@react-google-maps/api'
 import { Button } from '../components/ui/button'
 import { Card } from '../components/ui/card'
 import { Header } from '../components/Header'
 import { SpeciesCard } from '../components/SpeciesCard'
 import { BirdCharts } from '../components/BirdCharts'
-import { MapPin, Loader2, Search, Bird, X, Filter, Binoculars, Feather, User, ChevronDown, Settings, Save, Star } from 'lucide-react'
+import { BirdMap } from '../components/BirdMap'
+import { Loader2, Search, Bird, X, Filter, Binoculars, Feather, User, ChevronDown, Settings, Save, Star, MapPin } from 'lucide-react'
 import { preloadBirdPhotos } from '../lib/flickr'
 import { birdAPI, authAPI } from '../lib/api'
 import { useAuth } from '../contexts/AuthContext'
@@ -190,12 +191,7 @@ export default function Page() {
     return acc
   }, {} as Record<string, number>)
 
-  // Get unique locations from displayed birds (respecting filters)
-  const filteredLocationCoords = displayedBirds.reduce((acc, b) => {
-    if (!acc[b.loc]) acc[b.loc] = { lat: b.lat, lng: b.lng }
-    return acc
-  }, {} as Record<string, { lat: number; lng: number }>)
-
+  
   const mapCenter = lat !== null && lng !== null ? { lat, lng } : undefined
 
   return (
@@ -611,85 +607,13 @@ export default function Page() {
                 <div className="grid lg:grid-cols-2 gap-6 mb-6">
                   {/* Map Section */}
                   {isLoaded && mapCenter && (
-                    <Card variant="nature" className="p-0 overflow-hidden h-[500px]">
-                      <div className="nature-gradient p-4 flex items-center justify-between">
-                        <h3 className="text-white text-lg font-heading font-bold">
-                          Locations
-                          {(selectedSpecies || selectedLoc) && (
-                            <span className="text-sm font-normal ml-2 opacity-90">
-                              ({Object.keys(filteredLocationCoords).length} shown)
-                            </span>
-                          )}
-                        </h3>
-                        <span className="text-white/80 text-xs">
-                          <MapPin className="w-3 h-3 inline mr-1" />
-                          Click for details
-                        </span>
-                      </div>
-                      <GoogleMap
-                        mapContainerStyle={{ width: '100%', height: 'calc(100% - 60px)' }}
-                        center={mapCenter}
-                        zoom={9}
-                        options={{
-                          styles: [
-                            {
-                              featureType: 'water',
-                              elementType: 'geometry',
-                              stylers: [{ color: '#87CEEB' }, { lightness: 40 }],
-                            },
-                            {
-                              featureType: 'landscape',
-                              elementType: 'geometry',
-                              stylers: [{ color: '#E6EDE1' }],
-                            },
-                            {
-                              featureType: 'poi.park',
-                              elementType: 'geometry',
-                              stylers: [{ color: '#A7C299' }],
-                            },
-                            {
-                              featureType: 'road',
-                              elementType: 'geometry',
-                              stylers: [{ color: '#F5F2ED' }],
-                            },
-                          ],
-                        }}
-                      >
-                        {Object.entries(filteredLocationCoords).map(([loc, coords]) => (
-                          <Marker
-                            key={loc}
-                            position={coords}
-                            onClick={() => setSelectedLoc(loc)}
-                            icon={{
-                              url: selectedLoc === loc
-                                ? 'http://maps.google.com/mapfiles/ms/icons/green-dot.png'
-                                : 'http://maps.google.com/mapfiles/ms/icons/orange-dot.png',
-                            }}
-                          >
-                            {selectedLoc === loc && (
-                              <InfoWindow onCloseClick={() => setSelectedLoc(null)}>
-                                <div className="p-3">
-                                  <h4 className="font-heading font-bold text-forest-600 mb-2">{loc}</h4>
-                                  <p className="text-sm text-earth-500 mb-3">
-                                    <span className="font-semibold text-terracotta-500">{displayedBirds.filter(b => b.loc === loc).length}</span> rare {displayedBirds.filter(b => b.loc === loc).length === 1 ? 'bird' : 'birds'} 
-                                    {selectedSpecies && <span className="text-sage-600"> (filtered)</span>}
-                                  </p>
-                                  <div className="max-h-32 overflow-y-auto custom-scrollbar">
-                                    {displayedBirds
-                                      .filter(b => b.loc === loc)
-                                      .map((b, i) => (
-                                        <div key={i} className="text-sm py-1.5 px-2 rounded hover:bg-sage-50 transition-colors">
-                                          <span className="text-forest-600 font-medium">{b.species}</span>
-                                        </div>
-                                      ))}
-                                  </div>
-                                </div>
-                              </InfoWindow>
-                            )}
-                          </Marker>
-                        ))}
-                      </GoogleMap>
-                    </Card>
+                    <BirdMap
+                      birds={displayedBirds}
+                      center={mapCenter}
+                      selectedLoc={selectedLoc}
+                      selectedSpecies={selectedSpecies}
+                      onLocationSelect={setSelectedLoc}
+                    />
                   )}
                   
                   {/* Charts Section - matching map height */}
