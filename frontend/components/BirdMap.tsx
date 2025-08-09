@@ -62,6 +62,8 @@ export function BirdMap({
   onLocationSelect 
 }: BirdMapProps) {
   const [infoWindowLoc, setInfoWindowLoc] = useState<string | null>(null)
+  const [mapCenter, setMapCenter] = useState(center)
+  const [map, setMap] = useState<google.maps.Map | null>(null)
 
   // Filter birds based on selection
   const displayedBirds = useMemo(() => {
@@ -93,9 +95,13 @@ export function BirdMap({
     return locMap
   }, [displayedBirds])
 
-  const handleMarkerClick = (loc: string) => {
+  const handleMarkerClick = (loc: string, coords: { lat: number; lng: number }) => {
     setInfoWindowLoc(loc)
     onLocationSelect(loc)
+    // Center map on clicked marker
+    if (map) {
+      map.panTo(coords)
+    }
   }
 
   const handleInfoWindowClose = () => {
@@ -124,15 +130,16 @@ export function BirdMap({
       </div>
       <GoogleMap
         mapContainerStyle={{ width: '100%', height: 'calc(100% - 60px)' }}
-        center={center}
+        center={mapCenter}
         zoom={9}
         options={{ styles: mapStyles }}
+        onLoad={(mapInstance) => setMap(mapInstance)}
       >
         {locationEntries.map(([loc, data]) => (
           <Marker
             key={loc}
             position={data.coords}
-            onClick={() => handleMarkerClick(loc)}
+            onClick={() => handleMarkerClick(loc, data.coords)}
             icon={{
               url: (selectedLoc === loc || infoWindowLoc === loc)
                 ? 'http://maps.google.com/mapfiles/ms/icons/green-dot.png'
@@ -154,62 +161,67 @@ export function BirdMap({
                   onClick={(e) => e.stopPropagation()}
                 >
                   {/* Custom Popup */}
-                  <div className="bg-white rounded-lg shadow-lg border border-sage-200 p-2 w-full">
-                    {/* Header with location name and buttons in single row */}
-                    <div className="flex items-start justify-between gap-2 mb-2">
-                      <h4 className="font-heading font-bold text-forest-600 text-sm flex-1">{loc}</h4>
-                      
-                      {/* All buttons in header */}
-                      <div className="flex gap-0.5 items-center">
+                  <div className="bg-white rounded-lg shadow-lg border border-sage-200 w-full overflow-hidden">
+                    {/* Header section with location name and close button */}
+                    <div className="bg-forest-50 px-3 py-2 border-b border-sage-200 flex items-center justify-between">
+                      <h4 className="font-heading font-bold text-forest-700 text-sm">{loc}</h4>
+                      <button
+                        onClick={handleInfoWindowClose}
+                        className="inline-flex items-center p-0.5 hover:bg-forest-100 text-forest-600 hover:text-forest-800 rounded transition-colors"
+                        title="Close"
+                      >
+                        <X className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                    
+                    {/* Content section */}
+                    <div className="p-3">
+                      {/* Action buttons */}
+                      <div className="flex gap-1 mb-2">
                         <a
                           href={`https://ebird.org/hotspot/${data.loc_id}`}
                           target="_blank"
                           rel="noopener noreferrer"
-                          className="inline-flex items-center px-1.5 py-0.5 bg-sky-50 hover:bg-sky-100 text-sky-700 rounded text-xs transition-colors border border-sky-200"
+                          className="inline-flex items-center gap-1 px-2 py-1 bg-sky-50 hover:bg-sky-100 text-sky-700 rounded text-xs font-medium transition-colors border border-sky-200"
                           title="View location on eBird"
                           onClick={(e) => e.stopPropagation()}
                         >
-                          <ExternalLink className="w-2.5 h-2.5" />
+                          <ExternalLink className="w-3 h-3" />
+                          eBird
                         </a>
                         <a
                           href={`https://www.google.com/maps/search/?api=1&query=${data.coords.lat},${data.coords.lng}`}
                           target="_blank"
                           rel="noopener noreferrer"
-                          className="inline-flex items-center px-1.5 py-0.5 bg-sage-50 hover:bg-sage-100 text-forest-600 rounded text-xs transition-colors border border-sage-200"
+                          className="inline-flex items-center gap-1 px-2 py-1 bg-sage-50 hover:bg-sage-100 text-forest-600 rounded text-xs font-medium transition-colors border border-sage-200"
                           title="Open in Google Maps"
                           onClick={(e) => e.stopPropagation()}
                         >
-                          <Map className="w-2.5 h-2.5" />
+                          <Map className="w-3 h-3" />
+                          Maps
                         </a>
                         <a
                           href={`https://maps.apple.com/?ll=${data.coords.lat},${data.coords.lng}&q=${encodeURIComponent(loc)}`}
                           target="_blank"
                           rel="noopener noreferrer"
-                          className="inline-flex items-center px-1.5 py-0.5 bg-earth-50 hover:bg-earth-100 text-earth-700 rounded text-xs transition-colors border border-earth-200"
+                          className="inline-flex items-center gap-1 px-2 py-1 bg-earth-50 hover:bg-earth-100 text-earth-700 rounded text-xs font-medium transition-colors border border-earth-200"
                           title="Open in Apple Maps"
                           onClick={(e) => e.stopPropagation()}
                         >
-                          <Navigation className="w-2.5 h-2.5" />
+                          <Navigation className="w-3 h-3" />
+                          Apple
                         </a>
-                        <button
-                          onClick={handleInfoWindowClose}
-                          className="inline-flex items-center px-1 py-0.5 hover:bg-gray-100 text-gray-500 hover:text-gray-700 rounded text-xs transition-colors ml-1"
-                          title="Close"
-                        >
-                          <X className="w-3 h-3" />
-                        </button>
                       </div>
-                    </div>
-                    
-                    <p className="text-xs text-earth-500 mb-2">
+                      
+                      <p className="text-xs text-earth-500 mb-2">
                       <span className="font-semibold text-terracotta-500">
                         {data.species.size}
                       </span> unique {data.species.size === 1 ? 'species' : 'species'}
                       {selectedSpecies && <span className="text-sage-600"> (filtered)</span>}
                     </p>
-                    
-                    {/* Species List */}
-                    <div className="max-h-32 overflow-y-auto custom-scrollbar space-y-1">
+                      
+                      {/* Species List */}
+                      <div className="max-h-32 overflow-y-auto custom-scrollbar space-y-1">
                       {Array.from(data.species.entries())
                         .sort((a: [string, number], b: [string, number]) => b[1] - a[1])
                         .map(([species, count]: [string, number]) => (
@@ -225,6 +237,7 @@ export function BirdMap({
                             </span>
                           </div>
                         ))}
+                      </div>
                     </div>
                   </div>
                   
