@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useMemo } from 'react'
-import { GoogleMap, Marker, InfoWindow } from '@react-google-maps/api'
+import { GoogleMap, Marker, OverlayView } from '@react-google-maps/api'
 import { MapPin, ExternalLink, Map, Navigation, X } from 'lucide-react'
 import { Card } from './ui/card'
 
@@ -140,87 +140,99 @@ export function BirdMap({
             }}
           >
             {infoWindowLoc === loc && (
-              <InfoWindow 
-                onCloseClick={handleInfoWindowClose}
-                options={{
-                  pixelOffset: new google.maps.Size(0, -30),
-                  disableAutoPan: false
-                }}
+              <OverlayView
+                position={data.coords}
+                mapPaneName={OverlayView.OVERLAY_MOUSE_TARGET}
+                getPixelPositionOffset={() => ({
+                  x: -140, // Center horizontally (half of 280px width)
+                  y: -40,  // Position above marker
+                })}
               >
-                <div className="p-2 max-w-xs">
-                  {/* Header with location name and link buttons */}
-                  <div className="flex items-start justify-between gap-2 mb-2">
-                    <h4 className="font-heading font-bold text-forest-600 text-sm flex-1">{loc}</h4>
+                <div 
+                  className="relative"
+                  style={{ width: '280px' }}
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  {/* Custom Popup */}
+                  <div className="bg-white rounded-lg shadow-lg border border-sage-200 p-2 w-full">
+                    {/* Header with location name and buttons in single row */}
+                    <div className="flex items-start justify-between gap-2 mb-2">
+                      <h4 className="font-heading font-bold text-forest-600 text-sm flex-1">{loc}</h4>
+                      
+                      {/* All buttons in header */}
+                      <div className="flex gap-0.5 items-center">
+                        <a
+                          href={`https://ebird.org/hotspot/${data.loc_id}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="inline-flex items-center px-1.5 py-0.5 bg-sky-50 hover:bg-sky-100 text-sky-700 rounded text-xs transition-colors border border-sky-200"
+                          title="View location on eBird"
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          <ExternalLink className="w-2.5 h-2.5" />
+                        </a>
+                        <a
+                          href={`https://www.google.com/maps/search/?api=1&query=${data.coords.lat},${data.coords.lng}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="inline-flex items-center px-1.5 py-0.5 bg-sage-50 hover:bg-sage-100 text-forest-600 rounded text-xs transition-colors border border-sage-200"
+                          title="Open in Google Maps"
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          <Map className="w-2.5 h-2.5" />
+                        </a>
+                        <a
+                          href={`https://maps.apple.com/?ll=${data.coords.lat},${data.coords.lng}&q=${encodeURIComponent(loc)}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="inline-flex items-center px-1.5 py-0.5 bg-earth-50 hover:bg-earth-100 text-earth-700 rounded text-xs transition-colors border border-earth-200"
+                          title="Open in Apple Maps"
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          <Navigation className="w-2.5 h-2.5" />
+                        </a>
+                        <button
+                          onClick={handleInfoWindowClose}
+                          className="inline-flex items-center px-1 py-0.5 hover:bg-gray-100 text-gray-500 hover:text-gray-700 rounded text-xs transition-colors ml-1"
+                          title="Close"
+                        >
+                          <X className="w-3 h-3" />
+                        </button>
+                      </div>
+                    </div>
                     
-                    {/* Location Links and Close button - in header */}
-                    <div className="flex gap-0.5 items-center">
-                      <a
-                        href={`https://ebird.org/hotspot/${data.loc_id}`}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="inline-flex items-center px-1.5 py-0.5 bg-sky-50 hover:bg-sky-100 text-sky-700 rounded text-xs transition-colors border border-sky-200"
-                        title="View location on eBird"
-                        onClick={(e) => e.stopPropagation()}
-                      >
-                        <ExternalLink className="w-2.5 h-2.5" />
-                      </a>
-                      <a
-                        href={`https://www.google.com/maps/search/?api=1&query=${data.coords.lat},${data.coords.lng}`}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="inline-flex items-center px-1.5 py-0.5 bg-sage-50 hover:bg-sage-100 text-forest-600 rounded text-xs transition-colors border border-sage-200"
-                        title="Open in Google Maps"
-                        onClick={(e) => e.stopPropagation()}
-                      >
-                        <Map className="w-2.5 h-2.5" />
-                      </a>
-                      <a
-                        href={`https://maps.apple.com/?ll=${data.coords.lat},${data.coords.lng}&q=${encodeURIComponent(loc)}`}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="inline-flex items-center px-1.5 py-0.5 bg-earth-50 hover:bg-earth-100 text-earth-700 rounded text-xs transition-colors border border-earth-200"
-                        title="Open in Apple Maps"
-                        onClick={(e) => e.stopPropagation()}
-                      >
-                        <Navigation className="w-2.5 h-2.5" />
-                      </a>
-                      <button
-                        onClick={handleInfoWindowClose}
-                        className="inline-flex items-center px-1 py-0.5 hover:bg-gray-100 text-gray-500 hover:text-gray-700 rounded text-xs transition-colors ml-1"
-                        title="Close"
-                      >
-                        <X className="w-3 h-3" />
-                      </button>
+                    <p className="text-xs text-earth-500 mb-2">
+                      <span className="font-semibold text-terracotta-500">
+                        {data.species.size}
+                      </span> unique {data.species.size === 1 ? 'species' : 'species'}
+                      {selectedSpecies && <span className="text-sage-600"> (filtered)</span>}
+                    </p>
+                    
+                    {/* Species List */}
+                    <div className="max-h-32 overflow-y-auto custom-scrollbar space-y-1">
+                      {Array.from(data.species.entries())
+                        .sort((a: [string, number], b: [string, number]) => b[1] - a[1])
+                        .map(([species, count]: [string, number]) => (
+                          <div 
+                            key={species} 
+                            className="flex items-center justify-between text-sm py-1 px-2 rounded hover:bg-sage-50 transition-colors"
+                          >
+                            <span className="text-forest-600 font-medium flex-1 mr-2">
+                              {species}
+                            </span>
+                            <span className="text-earth-500 text-xs font-semibold bg-sage-100 px-1.5 py-0.5 rounded">
+                              {count}
+                            </span>
+                          </div>
+                        ))}
                     </div>
                   </div>
                   
-                  <p className="text-xs text-earth-500 mb-2">
-                    <span className="font-semibold text-terracotta-500">
-                      {data.species.size}
-                    </span> unique {data.species.size === 1 ? 'species' : 'species'}
-                    {selectedSpecies && <span className="text-sage-600"> (filtered)</span>}
-                  </p>
-                  
-                  {/* Species List */}
-                  <div className="max-h-32 overflow-y-auto custom-scrollbar space-y-1">
-                    {Array.from(data.species.entries())
-                      .sort((a: [string, number], b: [string, number]) => b[1] - a[1]) // Sort by count descending
-                      .map(([species, count]: [string, number]) => (
-                        <div 
-                          key={species} 
-                          className="flex items-center justify-between text-sm py-1 px-2 rounded hover:bg-sage-50 transition-colors"
-                        >
-                          <span className="text-forest-600 font-medium flex-1 mr-2">
-                            {species}
-                          </span>
-                          <span className="text-earth-500 text-xs font-semibold bg-sage-100 px-1.5 py-0.5 rounded">
-                            {count}
-                          </span>
-                        </div>
-                      ))}
-                  </div>
+                  {/* Pointer arrow */}
+                  <div className="absolute left-1/2 -translate-x-1/2 -bottom-2 w-0 h-0 border-l-[8px] border-l-transparent border-r-[8px] border-r-transparent border-t-[8px] border-t-white"></div>
+                  <div className="absolute left-1/2 -translate-x-1/2 -bottom-[9px] w-0 h-0 border-l-[9px] border-l-transparent border-r-[9px] border-r-transparent border-t-[9px] border-t-sage-200"></div>
                 </div>
-              </InfoWindow>
+              </OverlayView>
             )}
           </Marker>
         ))}
