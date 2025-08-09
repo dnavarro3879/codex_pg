@@ -39,6 +39,15 @@ export function Header() {
               <Map className="w-4 h-4" />
               <span>Explore</span>
             </Link>
+            <Link 
+              href="/find-species" 
+              className={`flex items-center gap-2 transition-colors font-heading font-medium ${
+                pathname === '/find-species' ? 'text-forest-600' : 'text-earth-600 hover:text-forest-600'
+              }`}
+            >
+              <Bird className="w-4 h-4" />
+              <span>Find Species</span>
+            </Link>
             {user && (
               <>
                 <Link 
@@ -112,6 +121,16 @@ export function Header() {
               >
                 <Map className="w-4 h-4" />
                 <span>Explore</span>
+              </Link>
+              <Link 
+                href="/find-species" 
+                className={`flex items-center gap-2 transition-colors font-heading font-medium py-2 ${
+                  pathname === '/find-species' ? 'text-forest-600' : 'text-earth-600 hover:text-forest-600'
+                }`}
+                onClick={() => setMobileMenuOpen(false)}
+              >
+                <Bird className="w-4 h-4" />
+                <span>Find Species</span>
               </Link>
               {user && (
                 <>

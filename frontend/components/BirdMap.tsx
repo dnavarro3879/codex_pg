@@ -23,6 +23,7 @@ interface BirdMapProps {
   selectedLoc: string | null
   selectedSpecies: string | null
   onLocationSelect: (location: string | null) => void
+  onSpeciesSelect?: (species: string) => void
 }
 
 interface LocationDataItem {
@@ -59,7 +60,8 @@ export function BirdMap({
   center, 
   selectedLoc, 
   selectedSpecies,
-  onLocationSelect 
+  onLocationSelect,
+  onSpeciesSelect
 }: BirdMapProps) {
   const [infoWindowLoc, setInfoWindowLoc] = useState<string | null>(null)
   const [mapCenter, setMapCenter] = useState(center)
@@ -225,9 +227,14 @@ export function BirdMap({
                       {Array.from(data.species.entries())
                         .sort((a: [string, number], b: [string, number]) => b[1] - a[1])
                         .map(([species, count]: [string, number]) => (
-                          <div 
-                            key={species} 
-                            className="flex items-center justify-between text-sm py-1 px-2 rounded hover:bg-sage-50 transition-colors"
+                          <button
+                            type="button"
+                            key={species}
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              onSpeciesSelect && onSpeciesSelect(species)
+                            }}
+                            className="w-full flex items-center justify-between text-left text-sm py-1 px-2 rounded hover:bg-sage-50 transition-colors"
                           >
                             <span className="text-forest-600 font-medium flex-1 mr-2">
                               {species}
@@ -235,7 +242,7 @@ export function BirdMap({
                             <span className="text-earth-500 text-xs font-semibold bg-sage-100 px-1.5 py-0.5 rounded">
                               {count}
                             </span>
-                          </div>
+                          </button>
                         ))}
                       </div>
                     </div>

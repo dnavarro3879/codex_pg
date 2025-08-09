@@ -9,6 +9,7 @@ from typing import Optional
 from .database import engine, get_db
 from . import models, schemas, auth
 from .routers import auth as auth_router
+from .routers import species as species_router
 from .services import BirdService
 
 
@@ -46,6 +47,7 @@ app.add_middleware(
 
 # Include routers
 app.include_router(auth_router.router)
+app.include_router(species_router.router)
 
 @app.get("/birds/rare", response_model=list[schemas.ObservedBird])
 async def rare_birds(

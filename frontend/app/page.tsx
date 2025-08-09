@@ -16,6 +16,8 @@ import { birdAPI, authAPI } from '../lib/api'
 import { useAuth } from '../contexts/AuthContext'
 import { useAuthModal } from '../contexts/useAuthModal'
 import { LocationModal } from '../components/LocationModal'
+import { DateFilter } from '../components/DateFilter'
+import { SpeciesDetailsModal } from '../components/SpeciesDetailsModal'
 
 interface ObservedBird {
   species: string
@@ -61,6 +63,25 @@ export default function Page() {
   const [showLocationDropdown, setShowLocationDropdown] = useState(false)
   const dropdownButtonRef = useRef<HTMLButtonElement>(null)
   const [dropdownPosition, setDropdownPosition] = useState({ top: 0, left: 0 })
+
+  // Date filter (inclusive cutoff)
+  const [cutoffDate, setCutoffDate] = useState<string | null>(null)
+
+  // Species details modal state
+  type ModalSighting = { location: string; loc_id: string; date: string; lat: number; lng: number }
+  const [speciesModal, setSpeciesModal] = useState<{
+    species: string
+    speciesCode: string
+    sightings: ModalSighting[]
+  } | null>(null)
+
+  const parseObservationDate = (dateStr: string): Date | null => {
+    if (!dateStr) return null
+    // Normalize to ISO-like string for safer parsing (Safari compatibility)
+    const normalized = dateStr.includes('T') ? dateStr : dateStr.replace(' ', 'T')
+    const d = new Date(normalized)
+    return isNaN(d.getTime()) ? null : d
+  }
 
   const { isLoaded } = useJsApiLoader({
     id: 'google-map-script',
@@ -178,6 +199,11 @@ export default function Page() {
   const displayedBirds = birds.filter(b => {
     if (selectedLoc && b.loc !== selectedLoc) return false
     if (selectedSpecies && b.species !== selectedSpecies) return false
+    if (cutoffDate) {
+      const obsDate = parseObservationDate(b.date)
+      const cutoffStart = new Date(`${cutoffDate}T00:00:00`)
+      if (!obsDate || obsDate < cutoffStart) return false
+    }
     return true
   })
 
@@ -193,6 +219,20 @@ export default function Page() {
 
   
   const mapCenter = lat !== null && lng !== null ? { lat, lng } : undefined
+
+  const openSpeciesModal = (speciesName: string) => {
+    const matching = displayedBirds.filter(b => b.species === speciesName)
+    if (matching.length === 0) return
+    const speciesCode = matching[0].species_code
+    const sightings: ModalSighting[] = matching.map(b => ({
+      location: b.loc,
+      loc_id: b.loc_id,
+      date: b.date,
+      lat: b.lat,
+      lng: b.lng,
+    }))
+    setSpeciesModal({ species: speciesName, speciesCode, sightings })
+  }
 
   return (
     <>
@@ -511,7 +551,7 @@ export default function Page() {
               </Card>
             </div>
 
-            {(selectedLoc || selectedSpecies) && (
+            {(selectedLoc || selectedSpecies || cutoffDate) && (
               <div className="mb-4 p-3 bg-sage-100 rounded-lg border border-sage-200">
                 <div className="flex items-center justify-between flex-wrap gap-2">
                   <div className="flex items-center gap-2 flex-wrap">
@@ -543,6 +583,19 @@ export default function Page() {
                         </button>
                       </span>
                     )}
+                    {cutoffDate && (
+                      <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-white rounded-full text-xs">
+                        {/* Calendar icon inline to avoid importing again here */}
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-3 h-3 text-forest-600"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg>
+                        <strong className="text-forest-600">Since {new Date(`${cutoffDate}T00:00:00`).toLocaleDateString()}</strong>
+                        <button
+                          onClick={() => setCutoffDate(null)}
+                          className="ml-1 hover:text-terracotta-500 transition-colors"
+                        >
+                          <X className="w-3 h-3" />
+                        </button>
+                      </span>
+                    )}
                   </div>
                   <Button 
                     variant="ghost" 
@@ -550,6 +603,7 @@ export default function Page() {
                     onClick={() => {
                       setSelectedLoc(null)
                       setSelectedSpecies(null)
+                      setCutoffDate(null)
                     }}
                     className="py-1 px-2 text-xs"
                   >
@@ -613,11 +667,16 @@ export default function Page() {
                       selectedLoc={selectedLoc}
                       selectedSpecies={selectedSpecies}
                       onLocationSelect={setSelectedLoc}
+                      onSpeciesSelect={openSpeciesModal}
                     />
                   )}
                   
                   {/* Charts Section - matching map height */}
                   <div className="h-[500px]">
+                    {/* Date Filter Control */}
+                    <div className="mb-3 flex items-center justify-end">
+                      <DateFilter cutoffDate={cutoffDate} onChange={setCutoffDate} />
+                    </div>
                     <BirdCharts 
                     speciesData={speciesCounts} 
                     locationData={locationCounts}
@@ -719,6 +778,15 @@ export default function Page() {
         }}
         onLocationSelect={handleLocationSelect}
         currentLocationId={currentLocation?.id || null}
+      />
+
+      {/* Species Details Modal (shared) */}
+      <SpeciesDetailsModal
+        isOpen={!!speciesModal}
+        onClose={() => setSpeciesModal(null)}
+        species={speciesModal?.species || ''}
+        speciesCode={speciesModal?.speciesCode || ''}
+        sightings={speciesModal?.sightings || []}
       />
     </>
   )

@@ -70,6 +70,32 @@ export const birdAPI = {
   },
 }
 
+// Species API functions
+export const speciesAPI = {
+  suggest: async (q: string, limit: number = 10) => {
+    const response = await api.get('/species/suggest', { params: { q, limit } })
+    return response.data as Array<{ species_name: string; species_code: string; scientific_name?: string }>
+  },
+  observations: async (args: {
+    species_code: string
+    radius_km?: number
+    cutoff_date?: string | null
+    lat?: number
+    lng?: number
+    location_type?: 'zip' | 'city'
+    location_value?: string
+  }) => {
+    const { cutoff_date, ...rest } = args
+    const response = await api.get('/species/observations', {
+      params: {
+        ...rest,
+        cutoff_date: cutoff_date || undefined,
+      },
+    })
+    return response.data
+  },
+}
+
 // Auth API functions
 export const authAPI = {
   addFavorite: async (species_name: string, species_code: string, scientific_name?: string, notes?: string) => {

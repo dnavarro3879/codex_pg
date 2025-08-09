@@ -111,3 +111,9 @@ class LocationResponse(LocationBase):
 
     class Config:
         from_attributes = True
+
+# Species suggestion schema
+class SpeciesSuggestion(BaseModel):
+    species_name: str
+    species_code: str
+    scientific_name: Optional[str] = None
