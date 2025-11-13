@@ -17,6 +17,7 @@ import { LocationSelector } from '../../components/find-species/LocationSelector
 import { ControlsBar } from '../../components/find-species/ControlsBar'
 import { useJsApiLoader } from '@react-google-maps/api'
 import { BirdMap } from '../../components/BirdMap'
+import { ObservationList } from '../../components/find-species/ObservationList'
 import { SpeciesDetailsModal } from '../../components/SpeciesDetailsModal'
 
 interface Observation {
@@ -45,6 +46,7 @@ export default function FindSpeciesPage() {
   const [imageUrl, setImageUrl] = useState<string | null>(null)
   const [imageAttribution, setImageAttribution] = useState<string | null>(null)
   const [selectedLoc, setSelectedLoc] = useState<string | null>(null)
+  const [activeView, setActiveView] = useState<'map' | 'list'>('map')
   type ModalSighting = { location: string; loc_id: string; date: string; lat: number; lng: number }
   const [speciesModal, setSpeciesModal] = useState<{
     species: string
@@ -152,7 +154,16 @@ export default function FindSpeciesPage() {
                         <span className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-forest-100 text-forest-700 text-xs font-heading">1</span>
                         <span className="text-sm font-heading text-forest-700">Choose species</span>
                       </div>
-                      <SpeciesAutocomplete selected={selected} onSelect={setSelected} />
+                      <SpeciesAutocomplete
+                        selected={selected}
+                        onSelect={setSelected}
+                        disabled={!!selected}
+                        onClear={() => {
+                          setSelected(null)
+                          setImageUrl(null)
+                          setImageAttribution(null)
+                        }}
+                      />
                     </div>
 
                     <div className="border-t border-sage-200" />
@@ -193,7 +204,7 @@ export default function FindSpeciesPage() {
                     </div>
 
                     {/* Actions */}
-                    <div className="flex flex-col sm:flex-row gap-2 justify-between pt-2">
+                    <div className="flex gap-2 justify-end pt-2">
                       <Button
                         variant="ghost"
                         onClick={() => {
@@ -206,7 +217,6 @@ export default function FindSpeciesPage() {
                           setImageUrl(null)
                           setImageAttribution(null)
                         }}
-                        className="sm:w-auto"
                       >
                         Clear
                       </Button>
@@ -214,7 +224,6 @@ export default function FindSpeciesPage() {
                         variant="nature"
                         onClick={handleSearch}
                         disabled={!selected || !locationValue || loading}
-                        className="sm:w-auto"
                       >
                         {loading ? (
                           <>
@@ -292,13 +301,33 @@ export default function FindSpeciesPage() {
 
             {/* Species preview moved into right pane above */}
 
-            {/* Results Map */}
+            {/* Results: View toggle + content */}
             <div>
+              <div className="flex items-center justify-between mb-3">
+                <div className="inline-flex rounded-lg overflow-hidden border border-sage-200">
+                  <button
+                    className={`px-3 py-1.5 text-sm ${activeView === 'map' ? 'bg-sage-100 text-forest-700' : 'bg-white text-earth-600 hover:bg-sage-50'}`}
+                    onClick={() => setActiveView('map')}
+                  >
+                    Map View
+                  </button>
+                  <button
+                    className={`px-3 py-1.5 text-sm ${activeView === 'list' ? 'bg-sage-100 text-forest-700' : 'bg-white text-earth-600 hover:bg-sage-50'}`}
+                    onClick={() => setActiveView('list')}
+                  >
+                    List View
+                  </button>
+                </div>
+                {results.length > 0 && (
+                  <div className="text-xs text-earth-500">{results.length} sightings</div>
+                )}
+              </div>
+
               {loading ? (
                 <div className="flex items-center gap-2 text-earth-600"><Loader2 className="w-4 h-4 animate-spin" /> Loading observations...</div>
               ) : results.length === 0 ? (
                 <div className="text-earth-500">No observations yet. Try adjusting range or date.</div>
-              ) : (
+              ) : activeView === 'map' ? (
                 isLoaded && mapCenter && (
                   <BirdMap
                     birds={results}
@@ -309,6 +338,8 @@ export default function FindSpeciesPage() {
                     onSpeciesSelect={openSpeciesModal}
                   />
                 )
+              ) : (
+                <ObservationList observations={results} onOpenLocation={(loc) => setSelectedLoc(loc)} />
               )}
             </div>
           </div>

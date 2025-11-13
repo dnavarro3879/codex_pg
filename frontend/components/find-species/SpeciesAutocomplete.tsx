@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react'
 import { speciesAPI } from '../../lib/api'
-import { Search } from 'lucide-react'
+import { Search, X } from 'lucide-react'
 
 export type SpeciesSuggestion = { species_name: string; species_code: string; scientific_name?: string }
 
@@ -10,14 +10,20 @@ interface SpeciesAutocompleteProps {
   label?: string
   selected: SpeciesSuggestion | null
   onSelect: (s: SpeciesSuggestion) => void
+  disabled?: boolean
+  onClear?: () => void
 }
 
-export function SpeciesAutocomplete({ label = 'Species', selected, onSelect }: SpeciesAutocompleteProps) {
+export function SpeciesAutocomplete({ label = 'Species', selected, onSelect, disabled = false, onClear }: SpeciesAutocompleteProps) {
   const [query, setQuery] = useState('')
   const [suggestions, setSuggestions] = useState<SpeciesSuggestion[]>([])
   const timer = useRef<number | null>(null)
 
   useEffect(() => {
+    if (disabled) {
+      setSuggestions([])
+      return
+    }
     if (!query) {
       setSuggestions([])
       return
@@ -43,12 +49,28 @@ export function SpeciesAutocomplete({ label = 'Species', selected, onSelect }: S
           onChange={(e) => {
             setQuery(e.target.value)
           }}
-          onFocus={() => selected && setQuery('')}
+          onFocus={() => !disabled && selected && setQuery('')}
           placeholder="Search species name"
-          className="w-full pl-10 pr-3 py-2 rounded-lg border border-sage-300 bg-white/90 focus:ring-2 focus:ring-forest-400 focus:border-forest-400 transition-all placeholder-earth-400 text-forest-700 text-sm font-medium"
+          className={`w-full pl-10 ${selected && disabled && onClear ? 'pr-20' : 'pr-3'} py-2 rounded-lg border border-sage-300 bg-white/90 focus:ring-2 focus:ring-forest-400 focus:border-forest-400 transition-all placeholder-earth-400 text-forest-700 text-sm font-medium disabled:opacity-70 disabled:cursor-not-allowed`}
+          disabled={disabled}
+          title={disabled ? 'Selected species locked. Click Clear to change.' : undefined}
         />
+        {selected && disabled && onClear && (
+          <button
+            type="button"
+            onClick={onClear}
+            className="absolute right-2 top-1/2 -translate-y-1/2 inline-flex items-center gap-1 px-2 py-1 text-xs rounded-md border border-sage-300 bg-white hover:bg-sage-50 text-earth-700"
+            title="Clear selected species"
+          >
+            <X className="w-3 h-3" />
+            Clear
+          </button>
+        )}
       </div>
-      {suggestions.length > 0 && (
+      {disabled && selected && (
+        <div className="mt-1 text-[11px] text-earth-500">Selected species locked. Click Clear to change.</div>
+      )}
+      {suggestions.length > 0 && !disabled && (
         <div className="absolute z-20 mt-1 w-full bg-white rounded-lg border border-sage-200 shadow-lg max-h-72 overflow-auto">
           {suggestions.map((s) => (
             <button
